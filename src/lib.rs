@@ -1,32 +1,5 @@
-//! Provide basic [capability-based security].
-//!
-//! The wrapper type [`WithCap`] associates a **capability** to an object, that
-//! is a set of access rights. When accessing the object, we must explicitly
-//! specify the access capability, and it must not violate the capability
-//! associated with the object at initialization.
-//!
-//! # Examples
-//!
-//! ```
-//! use capability::{Cap, WithCap};
-//!
-//! let data = WithCap::new(42, Cap::READ | Cap::WRITE);
-//!
-//! // Access with the correct capability.
-//! assert_eq!(data.access(Cap::READ).unwrap(), &42);
-//! assert_eq!(data.access(Cap::WRITE).unwrap(), &42);
-//! assert_eq!(data.access(Cap::READ | Cap::WRITE).unwrap(), &42);
-//!
-//! // Access with the incorrect capability.
-//! assert!(data.access(Cap::EXECUTE).is_err());
-//! assert!(data.access(Cap::READ | Cap::EXECUTE).is_err());
-//! ```
-//!
-//! [capability-based security]:
-//!     https://en.wikipedia.org/wiki/Capability-based_security
-//!
-
-#![no_std]
+#![cfg_attr(not(test), no_std)]
+#![doc = include_str!("../README.md")]
 
 bitflags::bitflags! {
     /// Capabilities (access rights).
@@ -40,11 +13,6 @@ bitflags::bitflags! {
         const EXECUTE = 1 << 2;
     }
 }
-
-/// Error type for capability violation.
-#[derive(Debug, Default, Eq, PartialEq)]
-#[non_exhaustive]
-pub struct CapError;
 
 /// A wrapper that holds a type with a capability.
 pub struct WithCap<T> {
@@ -68,7 +36,7 @@ impl<T> WithCap<T> {
     /// # Examples
     ///
     /// ```
-    /// use capability::{Cap, WithCap};
+    /// use cap_access::{Cap, WithCap};
     ///
     /// let data = WithCap::new(42, Cap::READ);
     ///
@@ -88,24 +56,24 @@ impl<T> WithCap<T> {
         &self.inner
     }
 
-    /// Access the inner value with the given capability, or return `CapError`
+    /// Access the inner value with the given capability, or return `None`
     /// if cannot access.
     ///
     /// # Examples
     ///
     /// ```
-    /// use capability::{Cap, CapError, WithCap};
+    /// use cap_access::{Cap, WithCap};
     ///
     /// let data = WithCap::new(42, Cap::READ);
     ///
     /// assert_eq!(data.access(Cap::READ).unwrap(), &42);
-    /// assert_eq!(data.access(Cap::WRITE).err(), Some(CapError::default()));
+    /// assert_eq!(data.access(Cap::WRITE), None);
     /// ```
-    pub const fn access(&self, cap: Cap) -> Result<&T, CapError> {
+    pub const fn access(&self, cap: Cap) -> Option<&T> {
         if self.can_access(cap) {
-            Ok(&self.inner)
+            Some(&self.inner)
         } else {
-            Err(CapError)
+            None
         }
     }
 
@@ -115,7 +83,7 @@ impl<T> WithCap<T> {
     /// # Examples
     ///
     /// ```
-    /// use capability::{Cap, WithCap};
+    /// use cap_access::{Cap, WithCap};
     ///
     /// let data = WithCap::new(42, Cap::READ);
     ///
@@ -128,12 +96,5 @@ impl<T> WithCap<T> {
         } else {
             Err(err)
         }
-    }
-}
-
-impl From<CapError> for axerrno::AxError {
-    #[inline]
-    fn from(_: CapError) -> Self {
-        Self::PermissionDenied
     }
 }
